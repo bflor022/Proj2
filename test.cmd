@@ -1,0 +1,1 @@
+python mydns.py cs.fiu.edu 202.12.27.33 > output.txt
