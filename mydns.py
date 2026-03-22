@@ -69,7 +69,7 @@ def make_query(domain):
     return msg_id, header + question
 
 
-# this sends a query to one dns server
+# send query to a DNS server (root or intermediate)
 def send_query(server, domain):
     print("----------------------------------------------------------------")
     print("DNS server to query: " + server)
@@ -85,10 +85,12 @@ def send_query(server, domain):
 
     sock.close()
 
-    print("Reply received (raw).")
+    print("Reply received.")
 
     return data
-#read name
+
+
+# read a domain name from DNS response (handles compression)
 def read_name(data, offset):
     name_parts = []
     visited = set()
@@ -123,6 +125,8 @@ def read_name(data, offset):
 
     return ".".join(name_parts), offset
 
+
+# parse a resource record from DNS response
 def parse_rr(data, offset):
     name, offset = read_name(data, offset)
 
@@ -149,6 +153,8 @@ def parse_rr(data, offset):
     offset = rdata_end
     return (name, rtype, rdata), offset
 
+
+# parse full DNS reply into sections
 def parse_reply(data):
     if len(data) < 12:
         return [], [], []
@@ -179,6 +185,8 @@ def parse_reply(data):
 
     return answers, authority, additional
 
+
+# display DNS reply contents
 def display_reply(answers, authority, additional):
     print("----------------------------------------------------------------")
     print("Reply received. Content overview:")
@@ -201,11 +209,10 @@ def display_reply(answers, authority, additional):
             print("Name :", name, "IP :", rdata)
 
 
+# choose next DNS server using Authority + Additional sections
 def pick_next_server(authority, additional):
-    # get all name servers from authority section
     ns_names = [rdata for name, rtype, rdata in authority if rtype == NS_REC]
 
-    # find matching IP addresses in additional section
     for name, rtype, rdata in additional:
         if rtype == A_REC and name in ns_names:
             return rdata
@@ -213,39 +220,13 @@ def pick_next_server(authority, additional):
     return None
 
 
-# ===========================
-# TODO: SEND query to intermediate servers (15%)
-# ===========================
-# take the IP from previous step and call send_query again
-
-
-# ===========================
-# TODO: RECEIVE reply from intermediate servers (15%)
-# ===========================
-# same process as root, just repeat until we get final answer
-
-
-# ===========================
-# TODO: DISPLAY IPs for queried domain name (15%)
-# ===========================
-# once we find A record:
-# print:
-# Name : domain IP: x.x.x.x
-
-
-# ===========================
-# TODO: MAIN LOOP FOR ITERATION
-# ===========================
-# loop:
+# main iterative DNS resolution loop
+# repeatedly:
 #   send query
-#   parse reply
-#   print reply
-#   check if answer found
-#   if not:
-#       get next server and repeat
-
-
-# main part of program
+#   receive and parse reply
+#   display results
+#   stop if A record found
+#   otherwise pick next server and repeat
 def main():
     if len(sys.argv) != 3:
         print("Usage: python mydns.py domain-name root-dns-ip")
@@ -264,18 +245,24 @@ def main():
             print("Error querying", server, ":", e)
             sys.exit(1)
 
+        # receive reply and parse DNS sections
         answers, authority, additional = parse_reply(data)
+
+        # display full reply contents
         display_reply(answers, authority, additional)
 
+        # check if final IP (A record) found
         final_ips = [(name, rdata) for name, rtype, rdata in answers if rtype == A_REC]
         if final_ips:
             break
 
+        # extract next DNS server from authority/additional sections
         next_server = pick_next_server(authority, additional)
         if next_server is None:
             print("Could not find a next DNS server to query. Stopping.")
             sys.exit(1)
 
+        # send query to intermediate server in next iteration
         server = next_server
 
     print("----------------------------------------------------------------")
