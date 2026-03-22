@@ -154,16 +154,38 @@ def send_query(server, domain):
 
 # main part of program
 def main():
+    if len(sys.argv) != 3:
+        print("Usage: python mydns.py domain-name root-dns-ip")
+        sys.exit(1)
+
     domain = sys.argv[1]
     server = sys.argv[2]
 
-    print("Starting DNS lookup for:", domain)
+    while True:
+        try:
+            data = send_query(server, domain)
+        except socket.timeout:
+            print("Timeout waiting for reply from", server)
+            sys.exit(1)
+        except Exception as e:
+            print("Error querying", server, ":", e)
+            sys.exit(1)
 
-    # right now only does one query (root)
-    data = send_query(server, domain)
+        answers, authority, additional = parse_reply(data)
+        display_reply(answers, authority, additional)
 
-    print("\nRaw response size:", len(data))
-    print("TODO: finish parsing and iteration")
+        final_ips = [(name, rdata) for name, rtype, rdata in answers if rtype == A_REC]
+        if final_ips:
+            break
+
+        next_server = pick_next_server(authority, additional)
+        if next_server is None:
+            print("Could not find a next DNS server to query. Stopping.")
+            sys.exit(1)
+
+        server = next_server
+
+    print("----------------------------------------------------------------")
 
 
 # run main
