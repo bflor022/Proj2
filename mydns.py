@@ -88,7 +88,7 @@ def send_query(server, domain):
     print("Reply received (raw).")
 
     return data
-
+#read name
 def read_name(data, offset):
     name_parts = []
     visited = set()
