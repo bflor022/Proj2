@@ -89,7 +89,39 @@ def send_query(server, domain):
 
     return data
 
+def read_name(data, offset):
+    name_parts = []
+    visited = set()
 
+    while True:
+        if offset >= len(data):
+            break
+
+        length = data[offset]
+
+        if (length & 0xC0) == 0xC0:
+            if offset + 1 >= len(data):
+                break
+            pointer = ((length & 0x3F) << 8) | data[offset + 1]
+            if pointer in visited:
+                break
+            visited.add(pointer)
+            sub_name, _ = read_name(data, pointer)
+            name_parts.append(sub_name)
+            offset += 2
+            return ".".join(filter(None, name_parts)), offset
+
+        elif length == 0:
+            offset += 1
+            break
+
+        else:
+            offset += 1
+            label = data[offset:offset + length].decode("ascii", errors="replace")
+            name_parts.append(label)
+            offset += length
+
+    return ".".join(name_parts), offset
 # ===========================
 # TODO: RECEIVE reply from root DNS server (15%)
 # ===========================
