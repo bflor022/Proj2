@@ -104,38 +104,72 @@ nscount = header[4] # number authority records
 arcount = header[5] # number of additional records
 
 
-# ===========================
-# TODO: DISPLAY server reply content (10%)
-# ===========================
-# need to print:
-# Reply received. Content overview:
-# X Answers.
-# X Intermediate Name Servers.
-# X Additional Information Records.
-#
-# also print:
-# Answers section
-# Authority Section
-# Additional Information Section
+def parse_dns_reply(data):
+    # get the first 12 bytes (DNS header) and turn them into numbers
+    header = struct.unpack("!HHHHHH", data[:12])
 
-print("----------------------------------------------------------------")
-print("Reply received. Content overview:")
-print(str(ancount) + " Answers.")
-print(str(nscount) + " Intermediate Name Servers.")
-print(str(arcount) + " Additional Information Records.")
+    # how many answers came back
+    ancount = header[3]
 
-print("Answers section:")
-print("Authority Section:")
-print("Additional Information Section:")
+    # how many name servers we got (authority section)
+    nscount = header[4]
 
+    # how many extra records (IPs for those servers)
+    arcount = header[5]
 
-# ===========================
-# TODO: EXTRACT intermediate DNS server IP (15%)
-# ===========================
-# from authority section get NS names
-# from additional section get their IPs
-# match them and pick one
+    # print basic info about the reply
+    print("----------------------------------------------------------------")
+    print("Reply received. Content overview:")
+    print(str(ancount) + " Answers.")
+    print(str(nscount) + " Intermediate Name Servers.")
+    print(str(arcount) + " Additional Information Records.")
 
+    # just printing section titles for now
+    print("Answers section:")
+    print("Authority Section:")
+    print("Additional Information Section:")
+
+    # start reading after the header
+    offset = 12
+
+    # skip the question part (domain name)
+    while data[offset] != 0:
+        offset += 1
+    offset += 5
+
+    ns_ips = {}
+
+    # skip answers if there are any
+    for _ in range(ancount):
+        offset += 2
+        rtype, rclass, ttl, rdlength = struct.unpack("!HHIH", data[offset:offset+10])
+        offset += 10 + rdlength
+
+    # go through authority section (name servers)
+    for _ in range(nscount):
+        offset += 2
+        rtype, rclass, ttl, rdlength = struct.unpack("!HHIH", data[offset:offset+10])
+        offset += 10 + rdlength
+
+    # get IPs from additional section
+    for _ in range(arcount):
+        offset += 2
+        rtype, rclass, ttl, rdlength = struct.unpack("!HHIH", data[offset:offset+10])
+        offset += 10
+
+        if rtype == A_REC:
+            ip = ".".join(str(b) for b in data[offset:offset+4])
+            ns_ips[len(ns_ips)] = ip
+
+        offset += rdlength
+
+    # pick one server to use next
+    if ns_ips:
+        next_server = list(ns_ips.values())[0]
+        print("Next DNS server to query:", next_server)
+        return next_server
+
+    return None
 
 # ===========================
 # TODO: SEND query to intermediate servers (15%)
