@@ -122,51 +122,41 @@ def read_name(data, offset):
             offset += length
 
     return ".".join(name_parts), offset
-# ===========================
-# TODO: RECEIVE reply from root DNS server (15%)
-# ===========================
-# we already get raw data from send_query()
-# next step is to parse the reply into sections
-
-#takes DNS header's first 12 bytes and converts to integers
-header = struct.unpack("!HHHHHH", data[:12])
-
-ancount = header[3] # number of answer records
-nscount = header[4] # number authority records
-arcount = header[5] # number of additional records
 
 
-# ===========================
-# TODO: DISPLAY server reply content (10%)
-# ===========================
-# need to print:
-# Reply received. Content overview:
-# X Answers.
-# X Intermediate Name Servers.
-# X Additional Information Records.
-#
-# also print:
-# Answers section
-# Authority Section
-# Additional Information Section
 
-print("----------------------------------------------------------------")
-print("Reply received. Content overview:")
-print(str(ancount) + " Answers.")
-print(str(nscount) + " Intermediate Name Servers.")
-print(str(arcount) + " Additional Information Records.")
+def display_reply(answers, authority, additional):
+    print("----------------------------------------------------------------")
+    print("Reply received. Content overview:")
+    print(str(len(answers)) + " Answers.")
+    print(str(len(authority)) + " Intermediate Name Servers.")
+    print(str(len(additional)) + " Additional Information Records.")
 
-print("Answers section:")
-print("Authority Section:")
-print("Additional Information Section:")
+    print("Answers section:")
+    for name, rtype, rdata in answers:
+        if rtype == A_REC:
+            print("Name :", name, "IP:", rdata)
+
+    print("Authority Section:")
+    for name, rtype, rdata in authority:
+        print("Name :", name, "Name Server:", rdata)
+
+    print("Additional Information Section:")
+    for name, rtype, rdata in additional:
+        if rtype == A_REC:
+            print("Name :", name, "IP :", rdata)
 
 
-# ===========================
-# TODO: EXTRACT intermediate DNS server IP (15%)
-# ===========================
-# from authority section get NS names
-# from additional section get their IPs
-# match them and pick one
+def pick_next_server(authority, additional):
+    # get all name servers from authority section
+    ns_names = [rdata for name, rtype, rdata in authority if rtype == NS_REC]
+
+    # find matching IP addresses in additional section
+    for name, rtype, rdata in additional:
+        if rtype == A_REC and name in ns_names:
+            return rdata
+
+    return None
 
 
 # ===========================
