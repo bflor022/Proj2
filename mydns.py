@@ -123,7 +123,61 @@ def read_name(data, offset):
 
     return ".".join(name_parts), offset
 
+def parse_rr(data, offset):
+    name, offset = read_name(data, offset)
 
+    if offset + 10 > len(data):
+        return (name, 0, ""), len(data)
+
+    rtype, rclass, ttl, rdlength = struct.unpack("!HHIH", data[offset:offset + 10])
+    offset += 10
+
+    rdata_start = offset
+    rdata_end = offset + rdlength
+
+    if rdata_end > len(data):
+        return (name, rtype, ""), len(data)
+
+    if rtype == A_REC and rdlength == 4:
+        ip_bytes = data[rdata_start:rdata_end]
+        rdata = ".".join(str(b) for b in ip_bytes)
+    elif rtype == NS_REC:
+        rdata, _ = read_name(data, rdata_start)
+    else:
+        rdata = data[rdata_start:rdata_end]
+
+    offset = rdata_end
+    return (name, rtype, rdata), offset
+
+def parse_reply(data):
+    if len(data) < 12:
+        return [], [], []
+
+    msg_id, flags, qdcount, ancount, nscount, arcount = struct.unpack("!HHHHHH", data[:12])
+
+    offset = 12
+
+    for _ in range(qdcount):
+        _, offset = read_name(data, offset)
+        offset += 4
+
+    answers = []
+    authority = []
+    additional = []
+
+    for _ in range(ancount):
+        rr, offset = parse_rr(data, offset)
+        answers.append(rr)
+
+    for _ in range(nscount):
+        rr, offset = parse_rr(data, offset)
+        authority.append(rr)
+
+    for _ in range(arcount):
+        rr, offset = parse_rr(data, offset)
+        additional.append(rr)
+
+    return answers, authority, additional
 
 def display_reply(answers, authority, additional):
     print("----------------------------------------------------------------")
