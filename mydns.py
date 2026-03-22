@@ -90,84 +90,33 @@ def send_query(server, domain):
     return data
 
 
-# ===========================
-# TODO: RECEIVE reply from root DNS server (15%)
-# ===========================
-# we already get raw data from send_query()
-# next step is to parse the reply into sections
-
-#takes DNS header's first 12 bytes and converts to integers
-header = struct.unpack("!HHHHHH", data[:12])
-
-ancount = header[3] # number of answer records
-nscount = header[4] # number authority records
-arcount = header[5] # number of additional records
-
-
-def parse_dns_reply(data):
-    # get the first 12 bytes (DNS header) and turn them into numbers
-    header = struct.unpack("!HHHHHH", data[:12])
-
-    # how many answers came back
-    ancount = header[3]
-
-    # how many name servers we got (authority section)
-    nscount = header[4]
-
-    # how many extra records (IPs for those servers)
-    arcount = header[5]
-
-    # print basic info about the reply
+def display_reply(answers, authority, additional):
     print("----------------------------------------------------------------")
     print("Reply received. Content overview:")
-    print(str(ancount) + " Answers.")
-    print(str(nscount) + " Intermediate Name Servers.")
-    print(str(arcount) + " Additional Information Records.")
+    print(str(len(answers)) + " Answers.")
+    print(str(len(authority)) + " Intermediate Name Servers.")
+    print(str(len(additional)) + " Additional Information Records.")
 
-    # just printing section titles for now
     print("Answers section:")
-    print("Authority Section:")
-    print("Additional Information Section:")
-
-    # start reading after the header
-    offset = 12
-
-    # skip the question part (domain name)
-    while data[offset] != 0:
-        offset += 1
-    offset += 5
-
-    ns_ips = {}
-
-    # skip answers if there are any
-    for _ in range(ancount):
-        offset += 2
-        rtype, rclass, ttl, rdlength = struct.unpack("!HHIH", data[offset:offset+10])
-        offset += 10 + rdlength
-
-    # go through authority section (name servers)
-    for _ in range(nscount):
-        offset += 2
-        rtype, rclass, ttl, rdlength = struct.unpack("!HHIH", data[offset:offset+10])
-        offset += 10 + rdlength
-
-    # get IPs from additional section
-    for _ in range(arcount):
-        offset += 2
-        rtype, rclass, ttl, rdlength = struct.unpack("!HHIH", data[offset:offset+10])
-        offset += 10
-
+    for name, rtype, rdata in answers:
         if rtype == A_REC:
-            ip = ".".join(str(b) for b in data[offset:offset+4])
-            ns_ips[len(ns_ips)] = ip
+            print("Name :", name, "IP:", rdata)
 
-        offset += rdlength
+    print("Authority Section:")
+    for name, rtype, rdata in authority:
+        print("Name :", name, "Name Server:", rdata)
 
-    # pick one server to use next
-    if ns_ips:
-        next_server = list(ns_ips.values())[0]
-        print("Next DNS server to query:", next_server)
-        return next_server
+    print("Additional Information Section:")
+    for name, rtype, rdata in additional:
+        if rtype == A_REC:
+            print("Name :", name, "IP :", rdata)
+
+def pick_next_server(authority, additional):
+    ns_names = [rdata for name, rtype, rdata in authority if rtype == NS_REC]
+
+    for name, rtype, rdata in additional:
+        if rtype == A_REC and name in ns_names:
+            return rdata
 
     return None
 
