@@ -128,6 +128,13 @@ def read_name(data, offset):
 # we already get raw data from send_query()
 # next step is to parse the reply into sections
 
+#takes DNS header's first 12 bytes and converts to integers
+header = struct.unpack("!HHHHHH", data[:12])
+
+ancount = header[3] # number of answer records
+nscount = header[4] # number authority records
+arcount = header[5] # number of additional records
+
 
 # ===========================
 # TODO: DISPLAY server reply content (10%)
@@ -142,6 +149,16 @@ def read_name(data, offset):
 # Answers section
 # Authority Section
 # Additional Information Section
+
+print("----------------------------------------------------------------")
+print("Reply received. Content overview:")
+print(str(ancount) + " Answers.")
+print(str(nscount) + " Intermediate Name Servers.")
+print(str(arcount) + " Additional Information Records.")
+
+print("Answers section:")
+print("Authority Section:")
+print("Additional Information Section:")
 
 
 # ===========================
